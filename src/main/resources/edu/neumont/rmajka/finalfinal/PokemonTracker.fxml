@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane fx:id="trackerRoot" prefHeight="600.0" prefWidth="900.0"
+            xmlns="http://javafx.com/javafx/17.0.12"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="edu.neumont.rmajka.finalfinal.TrackerController"
+            styleClass="tracker-root">
+
+    <!-- ===== TOP: title / view switch ===== -->
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="top-bar">
+            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+            <Label text="Pokédex Tracker" styleClass="app-title"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="teamBuilderButton" text="Team Builder -&gt;" styleClass="nav-button" mnemonicParsing="false"/>
+        </HBox>
+    </top>
+
+    <!-- ===== CENTER: search + counter list ===== -->
+    <center>
+        <VBox spacing="10.0" styleClass="tracker-center">
+            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+
+            <!-- Search row -->
+            <HBox spacing="8.0" alignment="CENTER_LEFT">
+                <TextField fx:id="speciesSearchField" promptText="Pokémon Species" HBox.hgrow="ALWAYS"/>
+                <Button fx:id="searchButton" text="Search" mnemonicParsing="false"/>
+                <Button fx:id="addCounterButton" text="+ Add" mnemonicParsing="false"/>
+            </HBox>
+
+            <Separator/>
+
+            <!-- Gen counter list -->
+            <ScrollPane fx:id="counterScrollPane" fitToWidth="true" VBox.vgrow="ALWAYS">
+                <content>
+                    <VBox fx:id="counterListContainer" spacing="6.0" styleClass="counter-list">
+                        <!--
+                            Rows get injected here at runtime by the controller, one per
+                            generation/species being tracked. Suggested row structure to
+                            build programmatically (e.g. a buildCounterRow(Pokemon mon)
+                            helper method that returns an HBox):
+
+                                HBox row
+                                  Label   speciesNameLabel   ("Gen N Pokémon")
+                                  Region  spacer             (HBox.hgrow = ALWAYS)
+                                  Label   counterValueLabel  ("#: num")
+                                  Button  incrementButton    ("num++")
+
+                            This keeps the FXML simple while the actual list is fully
+                            data-driven from your backend/model.
+                        -->
+                    </VBox>
+                </content>
+            </ScrollPane>
+        </VBox>
+    </center>
+
+    <!-- ===== RIGHT: Prof.Bug AI panel ===== -->
+    <right>
+        <VBox prefWidth="220.0" spacing="8.0" styleClass="profbug-panel">
+            <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
+            <Label text="Prof.Bug" styleClass="profbug-title"/>
+            <Separator/>
+
+            <ListView fx:id="chatHistoryList" VBox.vgrow="ALWAYS" styleClass="chat-history"/>
+
+            <HBox spacing="6.0" alignment="CENTER_LEFT">
+                <TextField fx:id="chatInputField" promptText="Ask Prof.Bug..." HBox.hgrow="ALWAYS"/>
+                <Button fx:id="chatSendButton" text="Send" mnemonicParsing="false"/>
+            </HBox>
+        </VBox>
+    </right>
+
+</BorderPane>
