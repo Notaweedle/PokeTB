@@ -1,38 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.geometry.Insets?>
 
-<BorderPane fx:id="trackerRoot" prefHeight="600.0" prefWidth="900.0"
-            xmlns="http://javafx.com/javafx/17.0.12"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="edu.neumont.rmajka.finalfinal.TrackerController"
-            styleClass="tracker-root">
+<BorderPane fx:id="trackerRoot" prefHeight="600.0" prefWidth="900.0" styleClass="tracker-root" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="edu.neumont.Pwest.finalfinal.TrackerController">
 
     <!-- ===== TOP: title / view switch ===== -->
     <top>
         <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="top-bar">
-            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
-            <Label text="Pokédex Tracker" styleClass="app-title"/>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="teamBuilderButton" text="Team Builder -&gt;" styleClass="nav-button" mnemonicParsing="false"/>
+            <padding><Insets bottom="10" left="15" right="15" top="10" /></padding>
+            <Label styleClass="app-title" text="Pokédex Tracker" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Button fx:id="teamBuilderButton" mnemonicParsing="false" onAction="#onSwitchToTeamBuilder" styleClass="nav-button" text="Team Builder -&gt;" />
         </HBox>
     </top>
 
     <!-- ===== CENTER: search + counter list ===== -->
     <center>
         <VBox spacing="10.0" styleClass="tracker-center">
-            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+            <padding><Insets bottom="10" left="15" right="15" top="10" /></padding>
 
             <!-- Search row -->
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <TextField fx:id="speciesSearchField" promptText="Pokémon Species" HBox.hgrow="ALWAYS"/>
-                <Button fx:id="searchButton" text="Search" mnemonicParsing="false"/>
-                <Button fx:id="addCounterButton" text="+ Add" mnemonicParsing="false"/>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <TextField fx:id="speciesSearchField" promptText="Pokémon Species" HBox.hgrow="ALWAYS" />
+                <Button fx:id="searchButton" mnemonicParsing="false" onAction="#onSearch" text="Search" />
+                <Button fx:id="addCounterButton" mnemonicParsing="false" text="+ Add" />
             </HBox>
 
-            <Separator/>
+            <Separator />
 
             <!-- Gen counter list -->
             <ScrollPane fx:id="counterScrollPane" fitToWidth="true" VBox.vgrow="ALWAYS">
@@ -45,7 +41,7 @@
                             helper method that returns an HBox):
 
                                 HBox row
-                                  Label   speciesNameLabel   ("Gen N Pokémon")
+                                  Label   speciesNameLabel   ("Pokémon->GetName()")
                                   Region  spacer             (HBox.hgrow = ALWAYS)
                                   Label   counterValueLabel  ("#: num")
                                   Button  incrementButton    ("num++")
@@ -62,15 +58,15 @@
     <!-- ===== RIGHT: Prof.Bug AI panel ===== -->
     <right>
         <VBox prefWidth="220.0" spacing="8.0" styleClass="profbug-panel">
-            <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
-            <Label text="Prof.Bug" styleClass="profbug-title"/>
-            <Separator/>
+            <padding><Insets bottom="10" left="10" right="10" top="10" /></padding>
+            <Label styleClass="profbug-title" text="Prof.Bug" />
+            <Separator />
 
-            <ListView fx:id="chatHistoryList" VBox.vgrow="ALWAYS" styleClass="chat-history"/>
+            <ListView fx:id="chatHistoryList" styleClass="chat-history" VBox.vgrow="ALWAYS" />
 
-            <HBox spacing="6.0" alignment="CENTER_LEFT">
-                <TextField fx:id="chatInputField" promptText="Ask Prof.Bug..." HBox.hgrow="ALWAYS"/>
-                <Button fx:id="chatSendButton" text="Send" mnemonicParsing="false"/>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+                <TextField fx:id="chatInputField" promptText="Ask Prof.Bug..." HBox.hgrow="ALWAYS" />
+                <Button fx:id="chatSendButton" mnemonicParsing="false" text="Send" />
             </HBox>
         </VBox>
     </right>

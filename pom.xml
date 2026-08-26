@@ -38,6 +38,11 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.14.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -60,7 +65,7 @@
                         <!-- Default configuration for running with: mvn clean javafx:run -->
                         <id>default-cli</id>
                         <configuration>
-                            <mainClass>edu.neumont.rmajka.finalfinal/edu.neumont.rmajka.finalfinal.HelloApplication
+                            <mainClass>edu.neumont.rmajka.finalfinal/edu.neumont.Pwest.finalfinal.Starter
                             </mainClass>
                             <launcher>app</launcher>
                             <jlinkZipName>app</jlinkZipName>
