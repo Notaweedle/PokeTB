@@ -61,7 +61,8 @@ public class APIController {
 
     }
 
-    private int findStat(JsonArray statsArray, String statName) {
+    // package-private so the unit tests can reach it
+    int findStat(JsonArray statsArray, String statName) {
         for (JsonElement element : statsArray) {
             JsonObject entry = element.getAsJsonObject();
             String name = entry.get("stat").getAsJsonObject().get("name").getAsString();
@@ -72,7 +73,8 @@ public class APIController {
         throw new IllegalStateException("Stat not found: " + statName);
     }
 
-    private List<String> extractNames(JsonArray array, String innerKey) {
+    // package-private so the unit tests can reach it
+    List<String> extractNames(JsonArray array, String innerKey) {
         return StreamSupport.stream(array.spliterator(), false)
                 .map(JsonElement::getAsJsonObject)
                 .map(entry -> entry.get(innerKey).getAsJsonObject().get("name").getAsString())
@@ -109,7 +111,18 @@ public class APIController {
 
     }
 
+    /**
+     * The full name list never changes while the app is running, so it is fetched once and
+     * reused. Both views switch back and forth, and without this each switch would spend a
+     * second re-downloading the same ~1300 names on the UI thread.
+     */
+    private static List<String> cachedNames;
+
     List<String> allPokemonNames() throws IOException, InterruptedException {
+
+        if (cachedNames != null) {
+            return cachedNames;
+        }
 
         String url = BASE_URL + "pokemon?limit=100000&offset=0";
 
@@ -127,10 +140,12 @@ public class APIController {
         JsonObject obj = JsonParser.parseString(response.body()).getAsJsonObject();
         JsonArray results = obj.get("results").getAsJsonArray();
 
-        return StreamSupport.stream(results.spliterator(), false)
+        cachedNames = StreamSupport.stream(results.spliterator(), false)
                 .map(JsonElement::getAsJsonObject)
                 .map(entry -> entry.get("name").getAsString())
                 .collect(Collectors.toList());
+
+        return cachedNames;
     }
 
 

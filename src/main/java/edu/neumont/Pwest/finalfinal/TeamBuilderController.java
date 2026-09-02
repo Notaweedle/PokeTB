@@ -2,26 +2,24 @@ package edu.neumont.Pwest.finalfinal;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonSyntaxException;
-import com.google.gson.reflect.TypeToken;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
-import javafx.geometry.Side;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
+import javafx.util.StringConverter;
 
 import java.io.*;
-import java.lang.reflect.Type;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 
 import javafx.fxml.Initializable;
 
@@ -100,6 +98,11 @@ public class TeamBuilderController implements Initializable {
 
     private TeamSlot[] team = new TeamSlot[6];
     private int currentSlotIndex = 0;
+    private List<ToggleButton> slotButtons;
+
+    private final Map<String, Pokemon> monCache = new HashMap<>();
+
+    private SpeciesAutocomplete autocomplete;
 
     static final String SAVE_DIR = String.valueOf(Paths.get(System.getProperty("user.home"), "Documents", "PokeTracker"));
     private static final String TEAM_FILE = SAVE_DIR + "/team.json";
@@ -110,78 +113,51 @@ public class TeamBuilderController implements Initializable {
         setupIvSpinners();
         setupEvSpinners();
         setupNatureAndAbilityChoices();
+        setupNameDisplay();
 
         saveTeamButton.setOnAction(e -> onSaveTeam());
         chatSendButton.setOnAction(e -> onSendChat());
         trackerButton.setOnAction(e -> onSwitchToTracker());
         speciesSearchField.setOnAction(e -> onSpeciesSearch());
 
-        List<String> allNames = null;
+        List<String> allNames;
         try {
             allNames = apiController.allPokemonNames();
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
+            allNames = List.of();
         }
-        setupAutocomplete(speciesSearchField, allNames);
+        autocomplete = SpeciesAutocomplete.attach(speciesSearchField, allNames);
 
-        // TODO: load persisted team data
-    }
-
-
-
-    private void setupAutocomplete(TextField field, List<String> allNames) {
-        ContextMenu suggestions = new ContextMenu();
-        suggestions.setHideOnEscape(true);
-
-        field.textProperty().addListener((obs, oldText, newText) -> {
-            if (newText == null || newText.isBlank()) {
-                suggestions.hide();
-                return;
-            }
-
-            String search = newText.toLowerCase();
-            List<MenuItem> matches = allNames.stream()
-                    .filter(name -> name.startsWith(search))
-                    .limit(10)
-                    .map(name -> {
-                        MenuItem item = new MenuItem(name);
-                        item.setOnAction(e -> {
-                            field.setText(name);
-                            field.positionCaret(name.length());
-                            suggestions.hide();
-                        });
-                        return item;
-                    })
-                    .collect(Collectors.toList());
-
-            if (matches.isEmpty()) {
-                suggestions.hide();
-            } else {
-                suggestions.getItems().setAll(matches);
-                if (!suggestions.isShowing()) {
-                    suggestions.show(field, Side.BOTTOM, 0, 0);
-                }
-            }
-        });
-
-        field.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
-            if (!isFocused) suggestions.hide();
-        });
+        team = loadTeam();
+        readSlotToForm(currentSlotIndex);
     }
 
     private void setupSlotToggleGroup() {
-        for (ToggleButton btn : List.of(monSlot1Button, monSlot2Button, monSlot3Button,
-                monSlot4Button, monSlot5Button, monSlot6Button)) {
+        slotButtons = List.of(monSlot1Button, monSlot2Button, monSlot3Button,
+                monSlot4Button, monSlot5Button, monSlot6Button);
+
+        for (ToggleButton btn : slotButtons) {
             btn.setToggleGroup(slotGroup);
         }
+
+
         monSlot1Button.setSelected(true);
+
         slotGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
             if (newToggle == null) {
+                slotGroup.selectToggle(oldToggle);
                 return;
             }
-            // TODO: save the currently displayed mon's fields into the old slot's
-            // model object before loading the new slot's data into the form.
 
+            int newIndex = slotButtons.indexOf(newToggle);
+            if (newIndex < 0 || newIndex == currentSlotIndex) {
+                return;
+            }
+
+            writeFormToSlot(currentSlotIndex);
+            currentSlotIndex = newIndex;
+            readSlotToForm(currentSlotIndex);
         });
     }
 
@@ -190,6 +166,7 @@ public class TeamBuilderController implements Initializable {
         for (Spinner<Integer> spinner : List.of(hpIvSpinner, atkIvSpinner, defIvSpinner,
                 spAtkIvSpinner, spDefIvSpinner, spdIvSpinner)) {
             spinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MAX_IV, 0));
+            guardSpinnerText(spinner, InputValidator::isIvInProgress);
         }
     }
 
@@ -199,8 +176,32 @@ public class TeamBuilderController implements Initializable {
 
         for (Spinner<Integer> spinner : evSpinners) {
             spinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MAX_STAT_EV, 0));
+            guardSpinnerText(spinner, InputValidator::isEvInProgress);
             spinner.valueProperty().addListener((obs, oldVal, newVal) -> updateEvTotal(evSpinners));
         }
+    }
+
+
+    private void guardSpinnerText(Spinner<Integer> spinner, Predicate<String> allows) {
+        TextField editor = spinner.getEditor();
+
+        editor.setTextFormatter(new TextFormatter<>(change ->
+                allows.test(change.getControlNewText()) ? change : null));
+
+        editor.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused) {
+                commitSpinnerText(spinner);
+            }
+        });
+    }
+
+    private void commitSpinnerText(Spinner<Integer> spinner) {
+        String text = spinner.getEditor().getText();
+        if (text == null || text.isBlank()) {
+            spinner.getEditor().setText(String.valueOf(spinner.getValue()));
+            return;
+        }
+        spinner.getValueFactory().setValue(Integer.parseInt(text));
     }
 
     private void updateEvTotal(List<Spinner<Integer>> evSpinners) {
@@ -210,18 +211,74 @@ public class TeamBuilderController implements Initializable {
 
         evTotalLabel.setText(total + " / " + MAX_TOTAL_EV);
 
-        // TODO: decide how you want to enforce the 510 cap -- e.g. flip evTotalLabel
-        // to an error styleClass, or roll back the most recent spinner change,
-        // when total > MAX_TOTAL_EV.
+        boolean overCap = total > MAX_TOTAL_EV;
+        evTotalLabel.getStyleClass().remove("ev-total-over");
+        if (overCap) {
+            evTotalLabel.getStyleClass().add("ev-total-over");
+        }
+        evTotalLabel.setStyle(overCap ? "-fx-text-fill: #c0392b; -fx-font-weight: bold;" : "");
+    }
+
+    private boolean evTotalIsLegal() {
+        int total = List.of(hpEvSpinner, atkEvSpinner, defEvSpinner,
+                        spAtkEvSpinner, spDefEvSpinner, spdEvSpinner).stream()
+                .mapToInt(Spinner::getValue)
+                .sum();
+
+        if (total <= MAX_TOTAL_EV) {
+            return true;
+        }
+
+        Alert over = new Alert(Alert.AlertType.WARNING);
+        over.setHeaderText("Too many EVs");
+        over.setContentText("This Pokemon has " + total + " EVs, but the limit is "
+                + MAX_TOTAL_EV + ".\nRemove " + (total - MAX_TOTAL_EV) + " before saving.");
+        over.showAndWait();
+        return false;
     }
     @FXML
     private void onSpeciesSearch() {
-        String query = speciesSearchField.getText().trim().toLowerCase().replace(" ", "-");
-        if (query.isEmpty()) {
+        InputValidator.SearchQuery query = InputValidator.parseSearch(speciesSearchField.getText());
+
+        if (!query.isValid()) {
+
+            Alert bad = new Alert(Alert.AlertType.WARNING);
+            bad.setHeaderText("That isn't a Pokemon I can look up");
+            bad.setContentText(query.getProblem());
+            bad.showAndWait();
             return;
         }
-        currentMon = apiController.fetchPokemon(query);
+
+        Pokemon found = lookupSpecies(query.getApiQuery());
+        if (found == null) {
+            return;
+        }
+
+        currentMon = found;
+
+        autocomplete.withoutSuggestions(() -> speciesSearchField.setText(currentMon.getName()));
+
         populateFromPokemon(currentMon);
+    }
+
+    private static String normalizeSpecies(String raw) {
+        return InputValidator.normalize(raw);
+    }
+
+    private Pokemon lookupSpecies(String normalizedName) {
+        if (normalizedName == null || normalizedName.isBlank()) {
+            return null;
+        }
+        Pokemon cached = monCache.get(normalizedName);
+        if (cached != null) {
+            return cached;
+        }
+
+        Pokemon fetched = apiController.fetchPokemon(normalizedName);
+        if (fetched != null) {
+            monCache.put(normalizedName, fetched);
+        }
+        return fetched;
     }
 
     private void populateFromPokemon(Pokemon mon) {
@@ -245,6 +302,25 @@ public class TeamBuilderController implements Initializable {
         }
     }
 
+    private void setupNameDisplay() {
+        StringConverter<String> slugDisplay = new StringConverter<String>() {
+            @Override
+            public String toString(String slug) {
+                return InputValidator.prettify(slug);
+            }
+
+            @Override
+            public String fromString(String typed) {
+                return InputValidator.normalize(typed);
+            }
+        };
+
+        for (ComboBox<String> box : List.of(move1ComboBox, move2ComboBox, move3ComboBox, move4ComboBox)) {
+            box.setConverter(slugDisplay);
+        }
+        abilityComboBox.setConverter(slugDisplay);
+    }
+
     private void setupNatureAndAbilityChoices() {
         natureComboBox.getItems().addAll(
                 "Hardy","Lonely","Adamant","Naughty","Brave",
@@ -256,8 +332,36 @@ public class TeamBuilderController implements Initializable {
 
     @FXML
     private void onSaveTeam() {
+        if (!evTotalIsLegal()) {
+            return;
+        }
+
         writeFormToSlot(currentSlotIndex);
-        saveTeam();
+
+        if (!saveTeam()) {
+            return;
+        }
+
+        TeamSlot saved = team[currentSlotIndex];
+        String what = saved == null
+                ? "Slot " + (currentSlotIndex + 1) + " cleared."
+                : InputValidator.prettify(saved.getSpeciesName())
+                  + " saved to slot " + (currentSlotIndex + 1) + ".";
+
+        Alert ok = new Alert(Alert.AlertType.INFORMATION);
+        ok.setHeaderText("Team saved");
+        ok.setContentText(what + "\n" + countFilledSlots() + " of 6 slots filled.");
+        ok.showAndWait();
+    }
+
+    private int countFilledSlots() {
+        int filled = 0;
+        for (TeamSlot slot : team) {
+            if (slot != null) {
+                filled++;
+            }
+        }
+        return filled;
     }
     private void onSendChat() {
         String message = chatInputField.getText();
@@ -270,6 +374,10 @@ public class TeamBuilderController implements Initializable {
         // prob not used
     }
     private void onSwitchToTracker() {
+
+        writeFormToSlot(currentSlotIndex);
+        saveTeam();
+
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("PokemonTracker.fxml"));
             Parent teamBuilderRoot = loader.load();
@@ -279,13 +387,23 @@ public class TeamBuilderController implements Initializable {
         }
     }
     private void writeFormToSlot(int index) {
+        String normalized = normalizeSpecies(speciesSearchField.getText());
+
+        // No species means an empty slot -- don't persist a blank shell.
+        if (normalized.isEmpty()) {
+            team[index] = null;
+            return;
+        }
+
         TeamSlot slot = team[index];
         if (slot == null) {
             slot = new TeamSlot();
             team[index] = slot;
         }
 
-        slot.setSpeciesName(speciesSearchField.getText());
+
+        boolean matchesCurrent = currentMon != null && currentMon.getName().equals(normalized);
+        slot.setSpeciesName(matchesCurrent ? currentMon.getName() : normalized);
         slot.setShiny(shinyCheckBox.isSelected());
         //Moves
         slot.setMove1(move1ComboBox.getValue());
@@ -318,6 +436,20 @@ public class TeamBuilderController implements Initializable {
             clearForm();
             return;
         }
+
+        autocomplete.withoutSuggestions(() -> {
+            currentMon = lookupSpecies(slot.getSpeciesName());
+            if (currentMon != null) {
+                populateFromPokemon(currentMon);
+            } else {
+                clearBaseStatLabels();
+            }
+
+            fillFormFrom(slot);
+        });
+    }
+
+    private void fillFormFrom(TeamSlot slot) {
         speciesSearchField.setText(slot.getSpeciesName());
         shinyCheckBox.setSelected(slot.isShiny());
         //moves
@@ -368,49 +500,36 @@ public class TeamBuilderController implements Initializable {
             spinner.getValueFactory().setValue(0);
         }
 
+        clearBaseStatLabels();
+
+        currentMon = null;
+    }
+
+    private void clearBaseStatLabels() {
         hpBaseLabel.setText("-");
         atkBaseLabel.setText("-");
         defBaseLabel.setText("-");
         spAtkBaseLabel.setText("-");
         spDefBaseLabel.setText("-");
         spdBaseLabel.setText("-");
-
-        currentMon = null;
     }
 
-    private void saveEntries(List<TrackedEntry> entries) {
-        new File(SAVE_DIR).mkdirs();
-        System.out.println(SAVE_DIR);
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (Writer writer = new FileWriter(TEAM_FILE)) {
-            gson.toJson(entries, writer);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 
-    private List<TrackedEntry> loadEntries() {
-        if (!Files.exists(Path.of(TEAM_FILE))) {
-            return new ArrayList<>();
-        }
-        Gson gson = new Gson();
-        try (Reader reader = Files.newBufferedReader(Path.of(TEAM_FILE))) {
-            Type listType = new TypeToken<List<TrackedEntry>>(){}.getType();
-            List<TrackedEntry> loaded = gson.fromJson(reader, listType);
-            return loaded == null ? new ArrayList<>() : loaded;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new ArrayList<>();
-        }
-    }
-
-    private void saveTeam() {
+    private boolean saveTeam() {
         new File(SAVE_DIR).mkdirs();
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+
         try (Writer writer = new FileWriter(TEAM_FILE)) {
             gson.toJson(team, writer);
-        } catch (IOException e) {
+            return true;
+        } catch (IOException | RuntimeException e) {
             e.printStackTrace();
+            Alert error = new Alert(Alert.AlertType.ERROR);
+            error.setHeaderText("Could not save your team.");
+            error.setContentText("Writing to \"" + TEAM_FILE + "\" failed:\n" + e.getMessage());
+            error.showAndWait();
+            return false;
         }
     }
 
@@ -420,8 +539,13 @@ public class TeamBuilderController implements Initializable {
         }
         try (Reader reader = Files.newBufferedReader(Path.of(TEAM_FILE))) {
             TeamSlot[] loaded = new Gson().fromJson(reader, TeamSlot[].class);
-            return loaded == null ? new TeamSlot[6] : loaded;
-        } catch (IOException | JsonSyntaxException e) {
+            if (loaded == null) {
+                return new TeamSlot[6];
+            }
+            TeamSlot[] sized = new TeamSlot[6];
+            System.arraycopy(loaded, 0, sized, 0, Math.min(loaded.length, 6));
+            return sized;
+        } catch (IOException | RuntimeException e) {
             e.printStackTrace();
             return new TeamSlot[6];
         }

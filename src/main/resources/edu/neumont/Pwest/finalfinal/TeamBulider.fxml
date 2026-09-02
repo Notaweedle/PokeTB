@@ -23,14 +23,17 @@
 
             <!-- Team slot picker (6 mons) -->
             <HBox alignment="CENTER_LEFT" spacing="6.0">
-                <Label text="Slot:" />
+                <Label text="Slot:">
+               <HBox.margin>
+                  <Insets right="50.0" />
+               </HBox.margin></Label>
                 <ToggleButton fx:id="monSlot1Button" mnemonicParsing="false" text="1" />
                 <ToggleButton fx:id="monSlot2Button" mnemonicParsing="false" text="2" />
                 <ToggleButton fx:id="monSlot3Button" mnemonicParsing="false" text="3" />
                 <ToggleButton fx:id="monSlot4Button" mnemonicParsing="false" text="4" />
                 <ToggleButton fx:id="monSlot5Button" mnemonicParsing="false" text="5" />
                 <ToggleButton fx:id="monSlot6Button" mnemonicParsing="false" text="6" />
-            <Separator opacity="0.0" prefWidth="275.0" />
+            <Separator opacity="0.0" prefWidth="150.0" />
             <Button contentDisplay="RIGHT" layoutX="100.0" mnemonicParsing="false" onAction="#clearForm" text="Clear Mon" />
             </HBox>
 

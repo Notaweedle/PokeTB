@@ -62,6 +62,7 @@ public class TrackerController implements Initializable {
     @FXML private Button chatSendButton;
 
     private List<TrackedEntry> trackedEntries = new ArrayList<>();
+    private SpeciesAutocomplete autocomplete;
 
     static final String SAVE_DIR = String.valueOf(Paths.get(System.getProperty("user.home"), "Documents", "PokeTracker"));
     private static final String SAVE_FILE = SAVE_DIR + "/tracker.json";
@@ -69,8 +70,6 @@ public class TrackerController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
 
-        // TODO: load persisted counter data and populate counterListContainer
-        // TODO: load persisted chat history (if you keep any) into chatHistoryList
 
         trackedEntries = loadEntries();
         counterListContainer.getChildren().addAll(
@@ -82,19 +81,31 @@ public class TrackerController implements Initializable {
         addCounterButton.setOnAction(e -> onAddCounter());
         chatSendButton.setOnAction(e -> onSendChat());
         teamBuilderButton.setOnAction(e -> onSwitchToTeamBuilder());
+
+        List<String> allNames;
+        try {
+            allNames = new APIController().allPokemonNames();
+        } catch (IOException | InterruptedException e) {
+            // No internet just means no suggestions -- the search box still works by hand.
+            e.printStackTrace();
+            allNames = List.of();
+        }
+        autocomplete = SpeciesAutocomplete.attach(speciesSearchField, allNames);
     }
     @FXML
     private String onSearch() {
-        String query = speciesSearchField.getText().trim().toLowerCase().replace(" ", "-");
+        InputValidator.SearchQuery parsed = InputValidator.parseSearch(speciesSearchField.getText());
 
-        if (query.isEmpty()) {
-
+        if (!parsed.isValid()) {
+            // Malformed input is caught here, so no request is sent at all.
             Alert errorAlert = new Alert(Alert.AlertType.WARNING);
             errorAlert.setHeaderText("INVALID QUERY");
-            errorAlert.setContentText("Input cannot be empty");
+            errorAlert.setContentText(parsed.getProblem());
             errorAlert.showAndWait();
             return null;
         }
+
+        String query = parsed.getApiQuery();
 
         APIController controller = new APIController();
         String url = controller.POKE_URL + query;
@@ -143,7 +154,7 @@ public class TrackerController implements Initializable {
         if (url == null) {
             return;
         }
-        String query = speciesSearchField.getText().trim().toLowerCase().replace(" ", "-");
+        String query = InputValidator.parseSearch(speciesSearchField.getText()).getApiQuery();
         APIController apiController = new APIController();
         Pokemon mon =  apiController.fetchPokemon(query);
 
@@ -167,11 +178,25 @@ public class TrackerController implements Initializable {
                         (entry.getSpeciesName()
                                 .substring(1)));
 
+        speciesNameLabel.setPrefWidth(135);
+        speciesNameLabel.setMinWidth(Region.USE_PREF_SIZE);
+        speciesNameLabel.setMaxWidth(Region.USE_PREF_SIZE);
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        spacer.setPrefWidth(70);
+        spacer.setMinWidth(Region.USE_PREF_SIZE);
+        spacer.setMaxWidth(Region.USE_PREF_SIZE);
+
         Label counterValueLabel = new Label("#: " + entry.getCount());
 
+        counterValueLabel.setPrefWidth(50);
+        counterValueLabel.setMinWidth(Region.USE_PREF_SIZE);
+        counterValueLabel.setMaxWidth(Region.USE_PREF_SIZE);
+
         ComboBox<String> gameComboBox = new ComboBox<>();
+
         gameComboBox.setPromptText("Select game");
         gameComboBox.getItems().addAll(entry.getAvailableGames());
         gameComboBox.setValue(entry.getGame());
@@ -179,6 +204,8 @@ public class TrackerController implements Initializable {
             entry.setGame(newGame);
             saveEntries(trackedEntries);
         });
+        gameComboBox.setPrefWidth(140);
+        gameComboBox.setMinWidth(Region.USE_PREF_SIZE);
 
         Button incrementButton = new Button("+1");
         incrementButton.setOnAction(e -> {
@@ -196,8 +223,10 @@ public class TrackerController implements Initializable {
             saveEntries(trackedEntries);
         });
 
+        incrementButton.getStyleClass().add("primary-button");
+        destroyRow.getStyleClass().add("danger-button");
 
-        row.getChildren().addAll(speciesNameLabel, spacer, gameComboBox, counterValueLabel, incrementButton,destroyRow);
+        row.getChildren().addAll(speciesNameLabel, spacer, gameComboBox,counterValueLabel, incrementButton,destroyRow);
         saveEntries(trackedEntries);
         return row;
     }
