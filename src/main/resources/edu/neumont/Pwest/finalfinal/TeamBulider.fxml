@@ -1,137 +1,163 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
+<?import javafx.geometry.*?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.geometry.Insets?>
 
-<BorderPane fx:id="teamBuilderRoot" prefHeight="700.0" prefWidth="900.0"
-            xmlns="http://javafx.com/javafx/17.0.12"
-            xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="edu.neumont.Pwest.finalfinal.TeamBuilderController"
-            styleClass="team-builder-root">
+<BorderPane fx:id="teamBuilderRoot" prefHeight="596.0" prefWidth="900.0" styleClass="team-builder-root" xmlns="http://javafx.com/javafx/17.0.12" xmlns:fx="http://javafx.com/fxml/1" fx:controller="edu.neumont.Pwest.finalfinal.TeamBuilderController">
 
     <!-- ===== TOP: title / view switch ===== -->
     <top>
         <HBox alignment="CENTER_LEFT" spacing="20.0" styleClass="top-bar">
-            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
-            <Label text="Team Builder" styleClass="app-title"/>
-            <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="trackerButton" text="&lt;- Tracker" styleClass="nav-button" mnemonicParsing="false"/>
+            <padding><Insets bottom="10" left="15" right="15" top="10" /></padding>
+            <Label styleClass="app-title" text="Team Builder" />
+            <Region HBox.hgrow="ALWAYS" />
+            <Button fx:id="trackerButton" mnemonicParsing="false" styleClass="nav-button" text="&lt;- Tracker" />
         </HBox>
     </top>
 
     <!-- ===== CENTER: slot picker + species + moves + stats ===== -->
     <center>
         <VBox spacing="12.0" styleClass="team-builder-center">
-            <padding><Insets top="10" right="15" bottom="10" left="15"/></padding>
+            <padding><Insets bottom="10" left="15" right="15" top="10" /></padding>
 
             <!-- Team slot picker (6 mons) -->
-            <HBox spacing="6.0" alignment="CENTER_LEFT">
-                <Label text="Slot:"/>
-                <ToggleButton fx:id="monSlot1Button" text="1" mnemonicParsing="false"/>
-                <ToggleButton fx:id="monSlot2Button" text="2" mnemonicParsing="false"/>
-                <ToggleButton fx:id="monSlot3Button" text="3" mnemonicParsing="false"/>
-                <ToggleButton fx:id="monSlot4Button" text="4" mnemonicParsing="false"/>
-                <ToggleButton fx:id="monSlot5Button" text="5" mnemonicParsing="false"/>
-                <ToggleButton fx:id="monSlot6Button" text="6" mnemonicParsing="false"/>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+                <Label text="Slot:" />
+                <ToggleButton fx:id="monSlot1Button" mnemonicParsing="false" text="1" />
+                <ToggleButton fx:id="monSlot2Button" mnemonicParsing="false" text="2" />
+                <ToggleButton fx:id="monSlot3Button" mnemonicParsing="false" text="3" />
+                <ToggleButton fx:id="monSlot4Button" mnemonicParsing="false" text="4" />
+                <ToggleButton fx:id="monSlot5Button" mnemonicParsing="false" text="5" />
+                <ToggleButton fx:id="monSlot6Button" mnemonicParsing="false" text="6" />
+            <Separator opacity="0.0" prefWidth="275.0" />
+            <Button contentDisplay="RIGHT" layoutX="100.0" mnemonicParsing="false" onAction="#clearForm" text="Clear Mon" />
             </HBox>
 
-            <Separator/>
+            <Separator />
 
             <!-- Species + shiny -->
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <TextField fx:id="speciesSearchField" promptText="Pokémon Species" HBox.hgrow="ALWAYS"/>
-                <CheckBox fx:id="shinyCheckBox" text="Shiny?" mnemonicParsing="false"/>
+            <HBox alignment="CENTER_LEFT" spacing="8.0">
+                <TextField fx:id="speciesSearchField" onAction="#onSpeciesSearch" promptText="Pokémon Species" HBox.hgrow="ALWAYS" />
+                <CheckBox fx:id="shinyCheckBox" mnemonicParsing="false" text="Shiny?" />
             </HBox>
+
 
             <!-- Moves -->
-            <HBox spacing="8.0" alignment="CENTER_LEFT">
-                <ComboBox fx:id="move1ComboBox" promptText="Move 1" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
-                <ComboBox fx:id="move2ComboBox" promptText="Move 2" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
-                <ComboBox fx:id="move3ComboBox" promptText="Move 3" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
-                <ComboBox fx:id="move4ComboBox" promptText="Move 4" HBox.hgrow="ALWAYS" maxWidth="Infinity"/>
-            </HBox>
+            <GridPane hgap="8.0" vgap="8.0">
+                <columnConstraints>
+                    <ColumnConstraints percentWidth="50.0" />
+                    <ColumnConstraints percentWidth="50.0" />
+                </columnConstraints>
+                <ComboBox fx:id="move1ComboBox" editable="true" maxWidth="Infinity" promptText="Move 1" GridPane.columnIndex="0" GridPane.rowIndex="0" />
+                <ComboBox fx:id="move2ComboBox" editable="true" maxWidth="Infinity" promptText="Move 2" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                <ComboBox fx:id="move3ComboBox" editable="true" maxWidth="Infinity" promptText="Move 3" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                <ComboBox fx:id="move4ComboBox" editable="true" maxWidth="Infinity" promptText="Move 4" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+            <rowConstraints>
+               <RowConstraints />
+               <RowConstraints />
+            </rowConstraints>
+            </GridPane>
 
-            <Separator/>
+            <Separator />
 
-            <!-- Stat grid: IV/EV per stat -->
             <GridPane fx:id="statsGrid" hgap="10.0" vgap="6.0">
                 <columnConstraints>
-                    <ColumnConstraints minWidth="50.0"/>
-                    <ColumnConstraints minWidth="70.0" percentWidth="16.0"/>
-                    <ColumnConstraints minWidth="70.0" percentWidth="16.0"/>
-                    <ColumnConstraints minWidth="70.0" percentWidth="16.0"/>
-                    <ColumnConstraints minWidth="70.0" percentWidth="16.0"/>
-                    <ColumnConstraints minWidth="70.0" percentWidth="16.0"/>
-                    <ColumnConstraints minWidth="70.0" percentWidth="16.0"/>
+                    <ColumnConstraints minWidth="45.0" />
+                    <ColumnConstraints minWidth="70.0" percentWidth="30.0" />
+                    <ColumnConstraints minWidth="70.0" percentWidth="30.0" />
+                    <ColumnConstraints minWidth="70.0" percentWidth="30.0" />
                 </columnConstraints>
 
-                <!-- Header row: stat names -->
-                <Label text="" GridPane.rowIndex="0" GridPane.columnIndex="0"/>
-                <Label text="HP" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
-                <Label text="ATK" GridPane.rowIndex="0" GridPane.columnIndex="2"/>
-                <Label text="DEF" GridPane.rowIndex="0" GridPane.columnIndex="3"/>
-                <Label text="SP.ATK" GridPane.rowIndex="0" GridPane.columnIndex="4"/>
-                <Label text="SP.DEF" GridPane.rowIndex="0" GridPane.columnIndex="5"/>
-                <Label text="SPD" GridPane.rowIndex="0" GridPane.columnIndex="6"/>
+                <!-- ===== Physical block ===== -->
+                <Label text="HP" GridPane.columnIndex="1" GridPane.rowIndex="0" />
+                <Label text="ATK" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                <Label text="DEF" GridPane.columnIndex="3" GridPane.rowIndex="0" />
 
-                <!-- IV row -->
-                <Label text="IV" GridPane.rowIndex="1" GridPane.columnIndex="0"/>
-                <Spinner fx:id="hpIvSpinner" editable="true" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
-                <Spinner fx:id="atkIvSpinner" editable="true" GridPane.rowIndex="1" GridPane.columnIndex="2"/>
-                <Spinner fx:id="defIvSpinner" editable="true" GridPane.rowIndex="1" GridPane.columnIndex="3"/>
-                <Spinner fx:id="spAtkIvSpinner" editable="true" GridPane.rowIndex="1" GridPane.columnIndex="4"/>
-                <Spinner fx:id="spDefIvSpinner" editable="true" GridPane.rowIndex="1" GridPane.columnIndex="5"/>
-                <Spinner fx:id="spdIvSpinner" editable="true" GridPane.rowIndex="1" GridPane.columnIndex="6"/>
+                <Label text="Base" GridPane.columnIndex="0" GridPane.rowIndex="1" />
+                <Label fx:id="hpBaseLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                <Label fx:id="atkBaseLabel" text="-" GridPane.columnIndex="2" GridPane.rowIndex="1" />
+                <Label fx:id="defBaseLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="1" />
 
-                <!-- EV row -->
-                <Label text="EV" GridPane.rowIndex="2" GridPane.columnIndex="0"/>
-                <Spinner fx:id="hpEvSpinner" editable="true" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
-                <Spinner fx:id="atkEvSpinner" editable="true" GridPane.rowIndex="2" GridPane.columnIndex="2"/>
-                <Spinner fx:id="defEvSpinner" editable="true" GridPane.rowIndex="2" GridPane.columnIndex="3"/>
-                <Spinner fx:id="spAtkEvSpinner" editable="true" GridPane.rowIndex="2" GridPane.columnIndex="4"/>
-                <Spinner fx:id="spDefEvSpinner" editable="true" GridPane.rowIndex="2" GridPane.columnIndex="5"/>
-                <Spinner fx:id="spdEvSpinner" editable="true" GridPane.rowIndex="2" GridPane.columnIndex="6"/>
+                <Label text="IV" GridPane.columnIndex="0" GridPane.rowIndex="2" />
+                <Spinner fx:id="hpIvSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="2" />
+                <Spinner fx:id="atkIvSpinner" editable="true" GridPane.columnIndex="2" GridPane.rowIndex="2" />
+                <Spinner fx:id="defIvSpinner" editable="true" GridPane.columnIndex="3" GridPane.rowIndex="2" />
+
+                <Label text="EV" GridPane.columnIndex="0" GridPane.rowIndex="3" />
+                <Spinner fx:id="hpEvSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                <Spinner fx:id="atkEvSpinner" editable="true" GridPane.columnIndex="2" GridPane.rowIndex="3" />
+                <Spinner fx:id="defEvSpinner" editable="true" GridPane.columnIndex="3" GridPane.rowIndex="3" />
+
+                <!-- ===== Special block ===== -->
+                <Label text="SP.ATK" GridPane.columnIndex="1" GridPane.rowIndex="4" />
+                <Label text="SP.DEF" GridPane.columnIndex="2" GridPane.rowIndex="4" />
+                <Label text="SPD" GridPane.columnIndex="3" GridPane.rowIndex="4" />
+
+                <Label text="Base" GridPane.columnIndex="0" GridPane.rowIndex="5" />
+                <Label fx:id="spAtkBaseLabel" text="-" GridPane.columnIndex="1" GridPane.rowIndex="5" />
+                <Label fx:id="spDefBaseLabel" text="-" GridPane.columnIndex="2" GridPane.rowIndex="5" />
+                <Label fx:id="spdBaseLabel" text="-" GridPane.columnIndex="3" GridPane.rowIndex="5" />
+
+                <Label text="IV" GridPane.columnIndex="0" GridPane.rowIndex="6" />
+                <Spinner fx:id="spAtkIvSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="6" />
+                <Spinner fx:id="spDefIvSpinner" editable="true" GridPane.columnIndex="2" GridPane.rowIndex="6" />
+                <Spinner fx:id="spdIvSpinner" editable="true" GridPane.columnIndex="3" GridPane.rowIndex="6" />
+
+                <Label text="EV" GridPane.columnIndex="0" GridPane.rowIndex="7" />
+                <Spinner fx:id="spAtkEvSpinner" editable="true" GridPane.columnIndex="1" GridPane.rowIndex="7" />
+                <Spinner fx:id="spDefEvSpinner" editable="true" GridPane.columnIndex="2" GridPane.rowIndex="7" />
+                <Spinner fx:id="spdEvSpinner" editable="true" GridPane.columnIndex="3" GridPane.rowIndex="7" />
+            <rowConstraints>
+               <RowConstraints />
+               <RowConstraints />
+               <RowConstraints />
+               <RowConstraints />
+               <RowConstraints />
+               <RowConstraints />
+               <RowConstraints />
+               <RowConstraints />
+            </rowConstraints>
             </GridPane>
 
             <!-- EV total -->
-            <HBox spacing="6.0" alignment="CENTER_LEFT">
-                <Label text="Total EV:"/>
-                <Label fx:id="evTotalLabel" text="0 / 510"/>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+                <Label text="Total EV:" />
+                <Label fx:id="evTotalLabel" text="0 / 510" />
             </HBox>
 
-            <Separator/>
+            <Separator />
 
             <!-- Nature + ability -->
-            <HBox spacing="20.0" alignment="CENTER_LEFT">
-                <HBox spacing="6.0" alignment="CENTER_LEFT">
-                    <Label text="Nature:"/>
-                    <ComboBox fx:id="natureComboBox" promptText="Select nature"/>
+            <HBox alignment="CENTER_LEFT" spacing="20.0">
+                <HBox alignment="CENTER_LEFT" spacing="6.0">
+                    <Label text="Nature:" />
+                    <ComboBox fx:id="natureComboBox" promptText="Select nature" />
                 </HBox>
-                <HBox spacing="6.0" alignment="CENTER_LEFT">
-                    <Label text="Ability:"/>
-                    <ComboBox fx:id="abilityComboBox" promptText="Select ability"/>
+                <HBox alignment="CENTER_LEFT" spacing="6.0">
+                    <Label text="Ability:" />
+                    <ComboBox fx:id="abilityComboBox" promptText="Select ability" />
                 </HBox>
             </HBox>
 
-            <Region VBox.vgrow="ALWAYS"/>
+            <Region VBox.vgrow="ALWAYS" />
 
-            <Button fx:id="saveTeamButton" text="Save to Team" mnemonicParsing="false"/>
+            <Button fx:id="saveTeamButton" mnemonicParsing="false" text="Save to Team" />
         </VBox>
     </center>
 
     <!-- ===== RIGHT: Prof.Bug AI panel (same as Tracker) ===== -->
     <right>
-        <VBox prefWidth="220.0" spacing="8.0" styleClass="profbug-panel">
-            <padding><Insets top="10" right="10" bottom="10" left="10"/></padding>
-            <Label text="Prof.Bug" styleClass="profbug-title"/>
-            <Separator/>
+        <VBox prefHeight="586.0" prefWidth="216.0" spacing="8.0" styleClass="profbug-panel">
+            <padding><Insets bottom="10" left="10" right="10" top="10" /></padding>
+            <Label styleClass="profbug-title" text="Prof.Bug" />
+            <Separator />
 
-            <ListView fx:id="chatHistoryList" VBox.vgrow="ALWAYS" styleClass="chat-history"/>
+            <ListView fx:id="chatHistoryList" prefHeight="482.0" prefWidth="200.0" styleClass="chat-history" VBox.vgrow="ALWAYS" />
 
-            <HBox spacing="6.0" alignment="CENTER_LEFT">
-                <TextField fx:id="chatInputField" promptText="Ask Prof.Bug..." HBox.hgrow="ALWAYS"/>
-                <Button fx:id="chatSendButton" text="Send" mnemonicParsing="false"/>
+            <HBox alignment="CENTER_LEFT" spacing="6.0">
+                <TextField fx:id="chatInputField" promptText="Ask Prof.Bug..." HBox.hgrow="ALWAYS" />
+                <Button fx:id="chatSendButton" mnemonicParsing="false" text="Send" />
             </HBox>
         </VBox>
     </right>

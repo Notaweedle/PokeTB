@@ -1,6 +1,7 @@
 package edu.neumont.Pwest.finalfinal;
 
 import com.google.gson.*;
+import javafx.scene.control.Alert;
 
 import java.io.IOException;
 import java.net.URI;
@@ -21,13 +22,11 @@ public class APIController {
     APIController(){}
 
 
-    Pokemon fetchPokemon(String nameOrId) throws IOException, InterruptedException {
+    Pokemon  fetchPokemon(String nameOrId)  {
 
         // --- 1. sanitize input ---
         String cleaned = nameOrId.toLowerCase().trim();
-//        IF cleaned fails your regex validation THEN
-//        handle invalid input( throw /return empty)
-//        END IF
+
 
         // --- 2. build + send request ---
         String  url = BASE_URL + "pokemon/" + cleaned;
@@ -36,16 +35,22 @@ public class APIController {
                 .GET().build();
 
 
-        HttpResponse<String> response =
-                client.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = null;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-
-
-        // --- 3. check response ---
-        if (response.statusCode() == 404) {
-            throw new IOException("404 error" +response.statusCode());
-        }else if(response.statusCode() != 200) {
-            throw new IOException("status code " + response.statusCode());
+            // --- 3. check response ---
+            if (response.statusCode() == 404) {
+                throw new IOException("404 error" +response.statusCode());
+            }else if(response.statusCode() != 200) {
+                throw new IOException("status code " + response.statusCode());
+            }
+        } catch (IOException | InterruptedException e) {
+            Alert errorAlert = new Alert(Alert.AlertType.ERROR);
+            errorAlert.setHeaderText("API can not be reached.");
+            errorAlert.setContentText("Due to a error Unable to reach API: \""+url+"\""+"\n*make sure you have internet*");
+            errorAlert.showAndWait();
+            return null;
         }
 
 
@@ -93,19 +98,20 @@ public class APIController {
         // both are lists of nested objects — map down to just the names
         List<String> abilities = extractNames(obj.get("abilities").getAsJsonArray(), "ability");
         List<String> moves     = extractNames(obj.get("moves").getAsJsonArray(), "move");
+        List<String> gamesIncludedIn = extractNames(obj.get("game_indices").getAsJsonArray(), "version");
 
                 // generation is NOT on this endpoint — see note below
 
 
           return  new Pokemon(name, dexNumber, hp, attack, defense,
                 spAttack, spDefense, speed, abilities, moves,
-                spriteUrl, shinyUrl);
+                spriteUrl, shinyUrl, gamesIncludedIn);
 
     }
 
     List<String> allPokemonNames() throws IOException, InterruptedException {
 
-        String url = BASE_URL + "pokemon-species?limit=100000&offset=0";
+        String url = BASE_URL + "pokemon?limit=100000&offset=0";
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -127,22 +133,7 @@ public class APIController {
                 .collect(Collectors.toList());
     }
 
-    String getPokeName(String nameOrId ) throws IOException, InterruptedException {
 
-        String cleaned = nameOrId.toLowerCase().trim();
-        String url = POKE_URL + cleaned;
-
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET().build();
-
-        HttpResponse<String> response =
-                client.send(request, HttpResponse.BodyHandlers.ofString());
-
-
-        return null;
-    }
 
 
 }

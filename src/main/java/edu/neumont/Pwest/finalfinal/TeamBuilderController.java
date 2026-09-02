@@ -1,13 +1,28 @@
 package edu.neumont.Pwest.finalfinal;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
+import javafx.geometry.Side;
+import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 
+import java.io.*;
+import java.lang.reflect.Type;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.stream.Collectors;
+
 import javafx.fxml.Initializable;
 
 /**
@@ -15,6 +30,7 @@ import javafx.fxml.Initializable;
  * Rename the package above to match your project structure, and update
  * fx:controller in the FXML to match if you move this class.
  */
+
 public class TeamBuilderController implements Initializable {
 
     private static final int MAX_TOTAL_EV = 510;
@@ -41,6 +57,14 @@ public class TeamBuilderController implements Initializable {
     @FXML private ComboBox<String> move2ComboBox;
     @FXML private ComboBox<String> move3ComboBox;
     @FXML private ComboBox<String> move4ComboBox;
+
+
+    @FXML private Label hpBaseLabel;
+    @FXML private Label atkBaseLabel;
+    @FXML private Label defBaseLabel;
+    @FXML private Label spAtkBaseLabel;
+    @FXML private Label spDefBaseLabel;
+    @FXML private Label spdBaseLabel;
 
     // ===== Stats grid =====
     @FXML private GridPane statsGrid;
@@ -71,6 +95,15 @@ public class TeamBuilderController implements Initializable {
     @FXML private TextField chatInputField;
     @FXML private Button chatSendButton;
 
+    APIController apiController = new APIController();
+    private Pokemon currentMon;
+
+    private TeamSlot[] team = new TeamSlot[6];
+    private int currentSlotIndex = 0;
+
+    static final String SAVE_DIR = String.valueOf(Paths.get(System.getProperty("user.home"), "Documents", "PokeTracker"));
+    private static final String TEAM_FILE = SAVE_DIR + "/team.json";
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         setupSlotToggleGroup();
@@ -81,8 +114,59 @@ public class TeamBuilderController implements Initializable {
         saveTeamButton.setOnAction(e -> onSaveTeam());
         chatSendButton.setOnAction(e -> onSendChat());
         trackerButton.setOnAction(e -> onSwitchToTracker());
+        speciesSearchField.setOnAction(e -> onSpeciesSearch());
 
-        // TODO: load persisted team data and select slot 1 by default
+        List<String> allNames = null;
+        try {
+            allNames = apiController.allPokemonNames();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        setupAutocomplete(speciesSearchField, allNames);
+
+        // TODO: load persisted team data
+    }
+
+
+
+    private void setupAutocomplete(TextField field, List<String> allNames) {
+        ContextMenu suggestions = new ContextMenu();
+        suggestions.setHideOnEscape(true);
+
+        field.textProperty().addListener((obs, oldText, newText) -> {
+            if (newText == null || newText.isBlank()) {
+                suggestions.hide();
+                return;
+            }
+
+            String search = newText.toLowerCase();
+            List<MenuItem> matches = allNames.stream()
+                    .filter(name -> name.startsWith(search))
+                    .limit(10)
+                    .map(name -> {
+                        MenuItem item = new MenuItem(name);
+                        item.setOnAction(e -> {
+                            field.setText(name);
+                            field.positionCaret(name.length());
+                            suggestions.hide();
+                        });
+                        return item;
+                    })
+                    .collect(Collectors.toList());
+
+            if (matches.isEmpty()) {
+                suggestions.hide();
+            } else {
+                suggestions.getItems().setAll(matches);
+                if (!suggestions.isShowing()) {
+                    suggestions.show(field, Side.BOTTOM, 0, 0);
+                }
+            }
+        });
+
+        field.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+            if (!isFocused) suggestions.hide();
+        });
     }
 
     private void setupSlotToggleGroup() {
@@ -90,21 +174,17 @@ public class TeamBuilderController implements Initializable {
                 monSlot4Button, monSlot5Button, monSlot6Button)) {
             btn.setToggleGroup(slotGroup);
         }
+        monSlot1Button.setSelected(true);
         slotGroup.selectedToggleProperty().addListener((obs, oldToggle, newToggle) -> {
             if (newToggle == null) {
                 return;
             }
             // TODO: save the currently displayed mon's fields into the old slot's
             // model object before loading the new slot's data into the form.
-            onSlotSelected((ToggleButton) newToggle);
+
         });
     }
 
-    private void onSlotSelected(ToggleButton selected) {
-        // TODO: look up the Pokémon assigned to this slot (if any) and populate
-        // speciesSearchField, shinyCheckBox, move combo boxes, spinners, and
-        // nature/ability combo boxes from it. Clear the form if the slot is empty.
-    }
 
     private void setupIvSpinners() {
         for (Spinner<Integer> spinner : List.of(hpIvSpinner, atkIvSpinner, defIvSpinner,
@@ -119,7 +199,6 @@ public class TeamBuilderController implements Initializable {
 
         for (Spinner<Integer> spinner : evSpinners) {
             spinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, MAX_STAT_EV, 0));
-            // Lambda listener: recompute the running total every time any EV spinner changes.
             spinner.valueProperty().addListener((obs, oldVal, newVal) -> updateEvTotal(evSpinners));
         }
     }
@@ -135,18 +214,51 @@ public class TeamBuilderController implements Initializable {
         // to an error styleClass, or roll back the most recent spinner change,
         // when total > MAX_TOTAL_EV.
     }
+    @FXML
+    private void onSpeciesSearch() {
+        String query = speciesSearchField.getText().trim().toLowerCase().replace(" ", "-");
+        if (query.isEmpty()) {
+            return;
+        }
+        currentMon = apiController.fetchPokemon(query);
+        populateFromPokemon(currentMon);
+    }
+
+    private void populateFromPokemon(Pokemon mon) {
+        // base stats
+        hpBaseLabel.setText(String.valueOf(mon.getHp()));
+        atkBaseLabel.setText(String.valueOf(mon.getAttack()));
+        defBaseLabel.setText(String.valueOf(mon.getDefense()));
+        spAtkBaseLabel.setText(String.valueOf(mon.getSpAttack()));
+        spDefBaseLabel.setText(String.valueOf(mon.getSpDefense()));
+        spdBaseLabel.setText(String.valueOf(mon.getSpeed()));
+
+        // abilities
+        abilityComboBox.getItems().setAll(mon.getAbilities());
+        abilityComboBox.setValue(null);
+
+        // moves — same list in all four boxes
+        List<String> moves = mon.getLearnableMoves();
+        for (ComboBox<String> box : List.of(move1ComboBox, move2ComboBox, move3ComboBox, move4ComboBox)) {
+            box.getItems().setAll(moves);
+            box.setValue(null);
+        }
+    }
 
     private void setupNatureAndAbilityChoices() {
-        // TODO: replace with the full nature list (25 natures) and pull abilities
-        // dynamically from the selected species via your Pokémon API layer.
-        natureComboBox.getItems().addAll("Adamant", "Modest", "Jolly", "Timid", "Bold");
+        natureComboBox.getItems().addAll(
+                "Hardy","Lonely","Adamant","Naughty","Brave",
+                "Bold",	"Docile","Impish","Lax","Relaxed",
+                "Modest","Mild","Bashful","Rash","Quiet",
+                "Calm","Gentle","Careful","Quirky","Sassy",
+                "Timid","Hasty","Jolly","Naive","Serious");
     }
 
+    @FXML
     private void onSaveTeam() {
-        // TODO: read every field above into a model object for the currently
-        // selected slot, then persist the full team via your encode/decode layer.
+        writeFormToSlot(currentSlotIndex);
+        saveTeam();
     }
-
     private void onSendChat() {
         String message = chatInputField.getText();
         if (message == null || message.isBlank()) {
@@ -155,12 +267,331 @@ public class TeamBuilderController implements Initializable {
         chatHistoryList.getItems().add("You: " + message);
         chatInputField.clear();
 
-        // TODO: send `message` (plus current team-building context, e.g. selected
-        // species) to Prof.Bug's backend and append the response with:
-        // chatHistoryList.getItems().add("Prof.Bug: " + response);
+        // prob not used
+    }
+    private void onSwitchToTracker() {
+        try {
+            FXMLLoader loader = new FXMLLoader(getClass().getResource("PokemonTracker.fxml"));
+            Parent teamBuilderRoot = loader.load();
+            trackerButton.getScene().setRoot(teamBuilderRoot);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    private void writeFormToSlot(int index) {
+        TeamSlot slot = team[index];
+        if (slot == null) {
+            slot = new TeamSlot();
+            team[index] = slot;
+        }
+
+        slot.setSpeciesName(speciesSearchField.getText());
+        slot.setShiny(shinyCheckBox.isSelected());
+        //Moves
+        slot.setMove1(move1ComboBox.getValue());
+        slot.setMove2(move2ComboBox.getValue());
+        slot.setMove3(move3ComboBox.getValue());
+        slot.setMove4(move4ComboBox.getValue());
+        //ability / nature
+        slot.setAbility(abilityComboBox.getValue());
+        slot.setNature(natureComboBox.getValue());
+        //IV
+        slot.setHpIv(hpIvSpinner.getValue());
+        slot.setAtkIv(atkIvSpinner.getValue());
+        slot.setDefIv(defIvSpinner.getValue());
+        slot.setSpAtkIv(spAtkIvSpinner.getValue());
+        slot.setSpDefIv(spDefIvSpinner.getValue());
+        slot.setSpdIv(spdIvSpinner.getValue());
+        //EV
+        slot.setHpEv(hpEvSpinner.getValue());
+        slot.setAtkEv(atkEvSpinner.getValue());
+        slot.setDefEv(defEvSpinner.getValue());
+        slot.setSpAtkEv(spAtkEvSpinner.getValue());
+        slot.setSpDefEv(spDefEvSpinner.getValue());
+        slot.setSpdEv(spdEvSpinner.getValue());
+
+
+    }
+    private void readSlotToForm(int index) {
+        TeamSlot slot = team[index];
+        if (slot == null) {
+            clearForm();
+            return;
+        }
+        speciesSearchField.setText(slot.getSpeciesName());
+        shinyCheckBox.setSelected(slot.isShiny());
+        //moves
+        move1ComboBox.setValue(slot.getMove1());
+        move2ComboBox.setValue(slot.getMove2());
+        move3ComboBox.setValue(slot.getMove3());
+        move4ComboBox.setValue(slot.getMove4());
+        //ability and stuff
+        abilityComboBox.setValue(slot.getAbility());
+        natureComboBox.setValue(slot.getNature());
+        //iv's
+        hpIvSpinner.getValueFactory().setValue(slot.getHpIv());
+        atkIvSpinner.getValueFactory().setValue(slot.getAtkIv());
+        defIvSpinner.getValueFactory().setValue(slot.getDefIv());
+        spAtkIvSpinner.getValueFactory().setValue(slot.getSpAtkIv());
+        spDefIvSpinner.getValueFactory().setValue(slot.getSpDefIv());
+        spdIvSpinner.getValueFactory().setValue(slot.getSpdIv());
+        //ev
+        hpEvSpinner.getValueFactory().setValue(slot.getHpEv());
+        atkEvSpinner.getValueFactory().setValue(slot.getAtkEv());
+        defEvSpinner.getValueFactory().setValue(slot.getDefEv());
+        spAtkEvSpinner.getValueFactory().setValue(slot.getSpAtkEv());
+        spDefEvSpinner.getValueFactory().setValue(slot.getSpDefEv());
+        spdEvSpinner.getValueFactory().setValue(slot.getSpdEv());
+
+    }
+    @FXML
+    private void clearForm() {
+        speciesSearchField.clear();
+        shinyCheckBox.setSelected(false);
+
+        for (ComboBox<String> box : List.of(move1ComboBox, move2ComboBox, move3ComboBox, move4ComboBox)) {
+            box.getItems().clear();
+            box.setValue(null);
+            box.getEditor().clear();
+        }
+
+        natureComboBox.setValue(null);
+        abilityComboBox.getItems().clear();
+        abilityComboBox.setValue(null);
+
+        for (Spinner<Integer> spinner : List.of(hpIvSpinner, atkIvSpinner, defIvSpinner,
+                spAtkIvSpinner, spDefIvSpinner, spdIvSpinner)) {
+            spinner.getValueFactory().setValue(0);
+        }
+        for (Spinner<Integer> spinner : List.of(hpEvSpinner, atkEvSpinner, defEvSpinner,
+                spAtkEvSpinner, spDefEvSpinner, spdEvSpinner)) {
+            spinner.getValueFactory().setValue(0);
+        }
+
+        hpBaseLabel.setText("-");
+        atkBaseLabel.setText("-");
+        defBaseLabel.setText("-");
+        spAtkBaseLabel.setText("-");
+        spDefBaseLabel.setText("-");
+        spdBaseLabel.setText("-");
+
+        currentMon = null;
     }
 
-    private void onSwitchToTracker() {
-        // TODO: swap the scene/root back to your Tracker view.
+    private void saveEntries(List<TrackedEntry> entries) {
+        new File(SAVE_DIR).mkdirs();
+        System.out.println(SAVE_DIR);
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        try (Writer writer = new FileWriter(TEAM_FILE)) {
+            gson.toJson(entries, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
+
+    private List<TrackedEntry> loadEntries() {
+        if (!Files.exists(Path.of(TEAM_FILE))) {
+            return new ArrayList<>();
+        }
+        Gson gson = new Gson();
+        try (Reader reader = Files.newBufferedReader(Path.of(TEAM_FILE))) {
+            Type listType = new TypeToken<List<TrackedEntry>>(){}.getType();
+            List<TrackedEntry> loaded = gson.fromJson(reader, listType);
+            return loaded == null ? new ArrayList<>() : loaded;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
+
+    private void saveTeam() {
+        new File(SAVE_DIR).mkdirs();
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        try (Writer writer = new FileWriter(TEAM_FILE)) {
+            gson.toJson(team, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private TeamSlot[] loadTeam() {
+        if (!Files.exists(Path.of(TEAM_FILE))) {
+            return new TeamSlot[6];
+        }
+        try (Reader reader = Files.newBufferedReader(Path.of(TEAM_FILE))) {
+            TeamSlot[] loaded = new Gson().fromJson(reader, TeamSlot[].class);
+            return loaded == null ? new TeamSlot[6] : loaded;
+        } catch (IOException | JsonSyntaxException e) {
+            e.printStackTrace();
+            return new TeamSlot[6];
+        }
+    }
+    public static class TeamSlot {
+        private String speciesName;
+        private boolean shiny;
+        private String move1, move2, move3, move4;
+        private int hpIv, atkIv, defIv, spAtkIv, spDefIv, spdIv;
+        private int hpEv, atkEv, defEv, spAtkEv, spDefEv, spdEv;
+        private String nature;
+        private String ability;
+
+        public String getSpeciesName() {
+            return speciesName;
+        }
+        public void setSpeciesName(String speciesName) {
+            this.speciesName = speciesName;
+        }
+        public boolean isShiny() {
+            return shiny;
+        }
+        public void setShiny(boolean shiny) {
+            this.shiny = shiny;
+        }
+        public String getMove1() {
+            return move1;
+        }
+
+        public void setMove1(String move1) {
+            this.move1 = move1;
+        }
+
+        public String getMove2() {
+            return move2;
+        }
+
+        public void setMove2(String move2) {
+            this.move2 = move2;
+        }
+
+        public String getMove3() {
+            return move3;
+        }
+
+        public void setMove3(String move3) {
+            this.move3 = move3;
+        }
+
+        public String getMove4() {
+            return move4;
+        }
+
+        public void setMove4(String move4) {
+            this.move4 = move4;
+        }
+
+        public int getHpIv() {
+            return hpIv;
+        }
+
+        public void setHpIv(int hpIv) {
+            this.hpIv = hpIv;
+        }
+
+        public int getAtkIv() {
+            return atkIv;
+        }
+
+        public void setAtkIv(int atkIv) {
+            this.atkIv = atkIv;
+        }
+
+        public int getDefIv() {
+            return defIv;
+        }
+
+        public void setDefIv(int defIv) {
+            this.defIv = defIv;
+        }
+
+        public int getSpDefIv() {
+            return spDefIv;
+        }
+
+        public void setSpDefIv(int spDefIv) {
+            this.spDefIv = spDefIv;
+        }
+
+        public int getSpAtkIv() {
+            return spAtkIv;
+        }
+
+        public void setSpAtkIv(int spAtkIv) {
+            this.spAtkIv = spAtkIv;
+        }
+
+        public int getSpdIv() {
+            return spdIv;
+        }
+
+        public void setSpdIv(int spdIv) {
+            this.spdIv = spdIv;
+        }
+
+        public int getHpEv() {
+            return hpEv;
+        }
+
+        public void setHpEv(int hpEv) {
+            this.hpEv = hpEv;
+        }
+
+        public int getAtkEv() {
+            return atkEv;
+        }
+
+        public void setAtkEv(int atkEv) {
+            this.atkEv = atkEv;
+        }
+
+        public int getDefEv() {
+            return defEv;
+        }
+
+        public void setDefEv(int defEv) {
+            this.defEv = defEv;
+        }
+
+        public int getSpAtkEv() {
+            return spAtkEv;
+        }
+
+        public void setSpAtkEv(int spAtkEv) {
+            this.spAtkEv = spAtkEv;
+        }
+
+        public int getSpDefEv() {
+            return spDefEv;
+        }
+
+        public void setSpDefEv(int spDefEv) {
+            this.spDefEv = spDefEv;
+        }
+
+        public int getSpdEv() {
+            return spdEv;
+        }
+
+        public void setSpdEv(int spdEv) {
+            this.spdEv = spdEv;
+        }
+
+        public String getNature() {
+            return nature;
+        }
+
+        public void setNature(String nature) {
+            this.nature = nature;
+        }
+
+        public String getAbility() {
+            return ability;
+        }
+
+        public void setAbility(String ability) {
+            this.ability = ability;
+        }
+    }
+
+
+
 }

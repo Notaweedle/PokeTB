@@ -11,7 +11,7 @@ public class Starter extends Application {
     @Override
     public void start(Stage stage) throws IOException {
         FXMLLoader fxmlLoader = new FXMLLoader(Starter.class.getResource("PokemonTracker.fxml"));
-        Scene scene = new Scene(fxmlLoader.load(), 800, 400);
+        Scene scene = new Scene(fxmlLoader.load(), 800, 600);
         stage.setTitle("Poké T&B");
         stage.setScene(scene);
         stage.show();

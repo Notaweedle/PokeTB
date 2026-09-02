@@ -1,24 +1,31 @@
 package edu.neumont.Pwest.finalfinal;
 
-import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
+import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 
-import java.io.IOException;
+import java.io.*;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.URL;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
-import javafx.fxml.Initializable;
+import java.util.stream.Collectors;
 
-import javax.swing.*;
+import javafx.fxml.Initializable;
 
 /**
  * Controller for Tracker.fxml.
@@ -54,11 +61,23 @@ public class TrackerController implements Initializable {
     @FXML private TextField chatInputField;
     @FXML private Button chatSendButton;
 
+    private List<TrackedEntry> trackedEntries = new ArrayList<>();
+
+    static final String SAVE_DIR = String.valueOf(Paths.get(System.getProperty("user.home"), "Documents", "PokeTracker"));
+    private static final String SAVE_FILE = SAVE_DIR + "/tracker.json";
+
     @Override
     public void initialize(URL location, ResourceBundle resources) {
+
         // TODO: load persisted counter data and populate counterListContainer
         // TODO: load persisted chat history (if you keep any) into chatHistoryList
 
+        trackedEntries = loadEntries();
+        counterListContainer.getChildren().addAll(
+                trackedEntries.stream()
+                        .map(this::buildCounterRow)
+                        .collect(Collectors.toList())
+        );
         searchButton.setOnAction(e -> onSearch());
         addCounterButton.setOnAction(e -> onAddCounter());
         chatSendButton.setOnAction(e -> onSendChat());
@@ -116,61 +135,71 @@ public class TrackerController implements Initializable {
 
         return url;
 
-        // TODO: call your Pokémon API layer with `query`, then either
-        // scroll to / highlight an existing counter row, or feed the
-        // result into onAddCounter().
+
     }
 
     private void onAddCounter() {
-        String url= onSearch();
+        String url = onSearch();
         if (url == null) {
             return;
         }
         String query = speciesSearchField.getText().trim().toLowerCase().replace(" ", "-");
+        APIController apiController = new APIController();
+        Pokemon mon =  apiController.fetchPokemon(query);
+
+        TrackedEntry entry = new TrackedEntry(mon.getName(),mon.getNationalDexNumber(),mon.getGamesIncludedIn() );
+        trackedEntries.add(entry);
+        counterListContainer.getChildren().add(buildCounterRow(entry));
+        saveEntries(trackedEntries);
 
 
 
+    }
 
-        HttpResponse<String> response = null;
+    private HBox buildCounterRow(TrackedEntry entry) {
+        HBox row = new HBox(8);
+        row.setAlignment(Pos.CENTER_LEFT);
 
-        HBox hBox = new HBox();
-        Label speciesNameLabel = new Label(query);
-        counterListContainer.getChildren().add(hBox);
-        hBox.getChildren().add(speciesNameLabel);
+        Label speciesNameLabel = new Label(entry.getSpeciesName()
+                .substring(0, 1)
+                .toUpperCase()
+                .concat
+                        (entry.getSpeciesName()
+                                .substring(1)));
 
         Region spacer = new Region();
-        Region spacer1 = new Region();
-        spacer.setPrefSize(50, 10);
-        spacer1.setPrefSize(50, 10);
-        hBox.getChildren().add(spacer);
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label counterValueLabel = new Label("#: " + entry.getCount());
 
-       Label counterValueNumLabel = new  Label("0");
-        Label counterValueTextLabel = new  Label("#:"+counterValueNumLabel.getText());
-        hBox.getChildren().add(counterValueTextLabel);
-
-        EventHandler<ActionEvent> event = new EventHandler<ActionEvent>() {
-            public void handle(ActionEvent e)
-            {
-                counterValueNumLabel.setText(counterValueNumLabel.getText()+1);
-            }
-        };
+        ComboBox<String> gameComboBox = new ComboBox<>();
+        gameComboBox.setPromptText("Select game");
+        gameComboBox.getItems().addAll(entry.getAvailableGames());
+        gameComboBox.setValue(entry.getGame());
+        gameComboBox.valueProperty().addListener((obs, oldGame, newGame) -> {
+            entry.setGame(newGame);
+            saveEntries(trackedEntries);
+        });
 
         Button incrementButton = new Button("+1");
-        incrementButton.setOnAction(event);
-        hBox.getChildren().add(spacer1);
-        hBox.getChildren().add(incrementButton);
+        incrementButton.setOnAction(e -> {
+            entry.setCount(entry.getCount() + 1);
+            counterValueLabel.setText("#: " + entry.getCount());
+            saveEntries(trackedEntries);
+        });
+
+        Button destroyRow = new Button("Gotten");
+        destroyRow.setOnAction(e -> {
+
+            counterListContainer.getChildren().remove(row);
+            row.getChildren().remove(entry);
+            trackedEntries.remove(entry);
+            saveEntries(trackedEntries);
+        });
 
 
-
-        // HBox row
-        //                                  Label   speciesNameLabel   ("Pokémon->GetName()")
-        //                                  Region  spacer             (HBox.hgrow = ALWAYS)
-        //                                  Label   counterValueLabel  ("#: num")
-        //                                  Button  incrementButton    ("num++")
-
-        // TODO: build a new counter row (see the comment in Tracker.fxml
-        // for the suggested HBox structure) and append it to
-        // counterListContainer.getChildren(). Persist the updated list.
+        row.getChildren().addAll(speciesNameLabel, spacer, gameComboBox, counterValueLabel, incrementButton,destroyRow);
+        saveEntries(trackedEntries);
+        return row;
     }
 
     private void onSendChat() {
@@ -184,10 +213,13 @@ public class TrackerController implements Initializable {
         // TODO: send `message` to Prof.Bug's backend (API call or rule-based
         // system) and append the response with:
         // chatHistoryList.getItems().add("Prof.Bug: " + response);
+        // not going to be implemented
     }
 
     @FXML
     private void onSwitchToTeamBuilder() {
+
+
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("TeamBulider.fxml"));
             Parent teamBuilderRoot = loader.load();
@@ -196,4 +228,32 @@ public class TrackerController implements Initializable {
             e.printStackTrace();
         }
     }
+
+    private void saveEntries(List<TrackedEntry> entries) {
+        new File(SAVE_DIR).mkdirs();
+        System.out.println(SAVE_DIR);
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        try (Writer writer = new FileWriter(SAVE_FILE)) {
+            gson.toJson(entries, writer);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private List<TrackedEntry> loadEntries() {
+        if (!Files.exists(Path.of(SAVE_FILE))) {
+            return new ArrayList<>();
+        }
+        Gson gson = new Gson();
+        try (Reader reader = Files.newBufferedReader(Path.of(SAVE_FILE))) {
+            Type listType = new TypeToken<List<TrackedEntry>>(){}.getType();
+            List<TrackedEntry> loaded = gson.fromJson(reader, listType);
+            return loaded == null ? new ArrayList<>() : loaded;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ArrayList<>();
+        }
+    }
 }
+
+
