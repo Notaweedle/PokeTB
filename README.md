@@ -37,3 +37,7 @@ To run the tests:
 ```bash
 ./mvnw test
 ```
+
+## Author
+
+Robert Majka. More of my projects are on my portfolio at [notaweedle.github.io](https://notaweedle.github.io/).
